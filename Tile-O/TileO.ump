@@ -1,0 +1,525 @@
+namespace ca.mcgill.ecse223.tileo.model;
+
+external Cloner {}
+
+use TileOPersistence.ump;
+use PlayModeController.ump;
+use TileOState.ump;
+
+class TileO {
+  1 -> * Game games;
+  1 -> 0..1 Game currentGame;
+}
+
+class Game {
+  depend ca.mcgill.ecse223.tileo.util.Cloner;
+  mode { DESIGN{} GAME{} GAME_WON{} GAME_ROLLDIEACTIONCARD{} GAME_CONNECTTILESACTIONCARD{} 
+  GAME_REMOVECONNECTIONACTIONCARD{} GAME_TELEPORTACTIONCARD{} GAME_LOSETURNACTIONCARD{} 
+  GAME_MOVEWINTILEACTIONCARD{} GAME_ADDITIONALMOVEACTIONCARD{} 
+  GAME_DEACTIVATEACTIONTILEACTIONCARD{} GAME_REVEALTILEACTIONCARD{} 
+  GAME_WINTILEHINTACTIONCARD{} GAME_SWAPPOSITIONACTIONCARD{} 
+  GAME_MOVEOTHERPLAYERACTIONCARD{} }
+  1 <@>- 2..4 Player players;
+  1 <@>- * Tile tiles;
+  1 <@>- * Connection connections;
+  1 <@>- 1 Deck deck;
+  1 <@>- 1 Die die;
+  1 -> 0..1 Player currentPlayer;
+  1 -> 0..1 WinTile winTile;
+  const Integer SpareConnectionPieces = 32;
+  Integer currentConnectionPieces;
+  const Integer NumberOfActionCards = 32;
+  public Game clone() {
+    return (Game) Cloner.clone(this);
+  }
+  public List<Tile> takeTurn(int numOfMoves){
+    Die die = this.die;
+		  Player currentPlayer = this.currentPlayer;
+		  List<Tile> possibleDestinations = currentPlayer.getPossibleMoves(numOfMoves);  
+		  return possibleDestinations;
+  }
+  public void addNewConnection(Tile tile1, Tile tile2) throws InvalidInputException{
+    try{
+	  Connection connection = new Connection(this);
+	  connection.addTile(tile1);
+	  connection.addTile(tile2);
+	  }
+	  catch(RuntimeException e){
+		  throw new InvalidInputException(e.getMessage());
+	  }
+  }
+  
+   public void deleteConnection(Connection connectionToDelete) throws InvalidInputException{
+    try{
+		  connectionToDelete.delete();
+	  }
+
+	  catch(RuntimeException e){
+		  throw new InvalidInputException(e.getMessage());
+	  }
+   }
+   public void determineNextPlayer(){
+	   boolean found = false;
+	   Player player = getCurrentPlayer();
+	   Player nextPlayer;
+	   while (!found) {
+		   try {
+			   nextPlayer = getPlayer(indexOfPlayer(player) + 1);
+		   } catch (IndexOutOfBoundsException e) {
+			   nextPlayer = getPlayer(0);
+		   }
+		   if (nextPlayer.getPlayerStatus() == PlayerStatus.Active) {
+			   found = true;
+		   } else {
+			   nextPlayer.takeTurn();
+		   }
+		   player = nextPlayer;
+	   }
+	   setCurrentPlayer(player);
+   }
+   
+   public void updateTileStatus() {
+	   for (Tile tile : getTiles()) {
+		   if (tile instanceof ActionTile) {
+			   ((ActionTile) tile).takeTurn();
+		   }
+	   }
+   }
+}
+
+class Player {
+  color { RED{} BLUE{} GREEN{} YELLOW{} }
+  1 -> 0..1 Tile startingTile;
+  0..4 -> 0..1 Tile currentTile;
+  Integer number;
+  Integer turnsUntilActive = 0;
+  
+  public List<Tile> getPossibleMoves(int numOfMoves){
+		   List<Tile> possibleDestinations = new ArrayList<Tile>();
+		   possibleDestinations = currentTile.getNeighbors(numOfMoves);
+		  
+		   List<Tile> optimalDestinations = new ArrayList<Tile>();
+		   
+		   for (int i=0; i<possibleDestinations.size();i++){
+			  if( ( Math.abs(possibleDestinations.get(i).getX() - this.currentTile.getX()) + Math.abs(possibleDestinations.get(i).getY()- this.currentTile.getY()) ) == numOfMoves ){
+				  optimalDestinations.add(possibleDestinations.get(i));
+			  }
+		   }
+		   
+		   if (optimalDestinations.size()==0){
+			   return possibleDestinations; 
+		   }
+		   
+		   else{
+			   return optimalDestinations;
+		   }
+		
+		   
+  }
+  
+ 
+}
+
+class Tile {
+  abstract;
+
+  2 tiles -- 0..4 Connection connections;
+  Integer x;
+  Integer y;
+  Boolean hasBeenVisited = false;
+  
+  public abstract void land();
+ 	
+  public List<Tile> getNeighbors(int numOfMoves){
+		   List<Tile> possibleDestinations = new ArrayList<Tile>();
+		   int x = this.getX();
+
+		   this.setX(15);
+		   
+		   boolean canContinue = false;
+
+		   if (numOfMoves==0)  {
+			   possibleDestinations.add(this);			   
+		   }
+
+		   else{
+			   List<Connection> connections = this.getConnections();
+
+			   for (int i=0;i<connections.size();i++){
+				   Connection thisConnection = connections.get(i);
+				   for (int n=0; n<thisConnection.getTiles().size();n++){
+					   if(thisConnection.getTiles().get(n).getX()!=15){
+						   canContinue = true;
+						   //possibleDestinations = thisConnection.getTiles().get(n).getNeighbors(newNumOfMoves);
+						   List <Tile> possibleDestinationsPart = thisConnection.getTiles().get(n).getNeighbors(numOfMoves-1);
+						   for (int q=0;q<possibleDestinationsPart.size();q++){
+							   if (!possibleDestinations.contains(possibleDestinationsPart.get(q))){
+								   possibleDestinations.add(possibleDestinationsPart.get(q));
+							   }
+							  
+						   }
+					   }
+				   }		  
+			   } 
+			   
+			   if ((canContinue==false)){
+				   this.setX(x);
+				   possibleDestinations.add(this);
+				   return possibleDestinations;
+			   }
+		   }
+		   
+		   
+
+		   this.setX(x);
+		   return possibleDestinations;
+  }
+	   
+}
+
+class ActionTile {
+  isA Tile;
+
+  immutable Integer inactivityPeriod;
+  Integer turnsUntilActive= 0;
+  
+  public void land(){
+   		  Game thisGame = this.getGame();
+	  Player currentPlayer = thisGame.getCurrentPlayer();
+	  currentPlayer.setCurrentTile(this);
+	  
+	  this.setHasBeenVisited(true);   
+	  
+	  if (this.getActionTileStatus().name().equals("Active")){
+		  
+		  int index = thisGame.indexOfPlayer(currentPlayer);
+		  int number = thisGame.numberOfPlayers();
+		  
+		  
+		  Deck deck = thisGame.getDeck();
+		  this.deactivate();
+		  thisGame.setMode( deck.getCurrentCard().getActionCardGameMode());	 
+	  }
+	  
+	  else{
+		 
+		  thisGame.determineNextPlayer();
+		  thisGame.updateTileStatus();
+		  thisGame.setMode(Mode.GAME);
+	  }
+  }
+  
+  public void activate(){
+	 this.setActionTileStatus(ActionTileStatus.Active);
+	 this.setTurnsUntilActive(0);
+  }
+  
+ 
+}
+
+class NormalTile {
+  isA Tile;
+  
+  public void land(){
+	Game thisGame=this.getGame();
+   
+	Player thisPlayer = thisGame.getCurrentPlayer();
+	thisPlayer.setCurrentTile(this);
+	int index = thisGame.indexOfPlayer(thisPlayer);
+	int number = thisGame.numberOfPlayers();    
+	
+	if(index+1==number){
+		thisGame.setCurrentPlayer(thisGame.getPlayer(0));
+	}
+   
+	else{
+		thisGame.setCurrentPlayer(thisGame.getPlayer(index+1));
+   	}  
+ 	this.setHasBeenVisited(true);   thisGame.setMode(Mode.GAME);
+  }
+  
+}
+
+class WinTile {
+  isA Tile;
+  
+  public void land(){
+  	Game currentGame = this.getGame();
+  	Player currentPlayer = currentGame.getCurrentPlayer();
+  	currentPlayer.setCurrentTile(this);
+  	
+  	setHasBeenVisited(true);
+  	currentGame.setMode(Mode.GAME_WON);
+  }
+  
+  
+}
+
+class Connection {
+}
+
+class Deck {
+  1 <@>- 0..32 ActionCard cards;
+  1 -> 0..1 ActionCard currentCard;
+  
+  public void shuffle(){
+  	for (int i=0;i<31;i++){
+  		int randomNumber = (int)(Math.random()*31);
+  		addOrMoveCardAt(cards.get(i),randomNumber);
+  	}
+  }
+}
+
+class ActionCard {
+  abstract;
+
+  immutable String instructions;
+  
+  public abstract Mode getActionCardGameMode();
+  
+}
+
+class RollDieActionCard {
+  isA ActionCard;
+  
+  public Mode getActionCardGameMode() {
+  	return Mode.GAME_ROLLDIEACTIONCARD;
+  }
+  
+  public List<Tile> play(int numOfMoves){
+	   Game thisGame = this.getDeck().getGame();
+	   Die thisDie = thisGame.getDie();
+	   List<Tile> possibleDestinations = thisGame.takeTurn(numOfMoves);
+	   return possibleDestinations;
+  }
+}
+
+class ConnectTilesActionCard {
+  isA ActionCard;
+  
+  public void play(Tile tile1, Tile tile2) throws InvalidInputException{
+  	Connection connection = new Connection(tile1.getGame());
+  	connection.addTile(tile1);
+  	connection.addTile(tile2);
+  	
+  	tile1.getGame().addConnection(connection);
+  }
+  
+  public Mode getActionCardGameMode() {
+  	return Mode.GAME_CONNECTTILESACTIONCARD;
+  }
+  
+}
+
+class RemoveConnectionActionCard {
+  isA ActionCard;
+  
+  public void play(Connection connection){
+  	connection.delete();
+  }
+  
+  public Mode getActionCardGameMode() {
+  	return Mode.GAME_REMOVECONNECTIONACTIONCARD;
+  }
+}
+
+class TeleportActionCard {
+  isA ActionCard;
+  
+  public void play(Tile tile)throws InvalidInputException{
+  	tile.land();
+  }
+  
+  public Mode getActionCardGameMode() {
+  	return Mode.GAME_TELEPORTACTIONCARD;
+  }
+  
+}
+
+class LoseTurnActionCard {
+  isA ActionCard;
+  
+  public Mode getActionCardGameMode() {
+  	return Mode.GAME_LOSETURNACTIONCARD;
+  }
+  
+  public void play(){
+	   Game currentGame = this.getDeck().getGame();
+	   Player currentPlayer = currentGame.getCurrentPlayer();
+	   currentPlayer.loseTurns(1); //turn num = 1   
+  }
+
+}
+
+class MoveWinTileActionCard {
+  isA ActionCard;
+  
+   public Mode getActionCardGameMode(){
+    return Mode.GAME_MOVEWINTILEACTIONCARD;
+  }
+   
+   public void play(Tile tile){
+	       Game currentGame = this.getDeck().getGame();
+	  
+	   WinTile currentWinTile = currentGame.getWinTile();
+	   NormalTile normalTile = new NormalTile(currentWinTile.getX(),currentWinTile.getY(),currentGame);
+	   
+	   for (int i=0;i<currentWinTile.getConnections().size();i++){
+		   
+		   
+		   Connection aConnection = currentWinTile.getConnections().get(i);
+		   Connection newConnection = new Connection(currentGame);
+		   newConnection.addTile(normalTile);
+		   int ind = aConnection.getTiles().indexOf(currentWinTile);
+		   if (ind==0){
+			   newConnection.addTile(aConnection.getTiles().get(1));
+			   aConnection.getTiles().get(1).removeConnection(aConnection);
+		   }
+		   else{
+			   newConnection.addTile(aConnection.getTiles().get(0));
+			   aConnection.getTiles().get(0).removeConnection(aConnection);
+		   }
+	   }
+	   
+	   currentWinTile.delete();
+	   
+	   
+	   WinTile newWinTile = new WinTile(tile.getX(),tile.getY(),currentGame);
+	   
+	   for (int i=0;i<tile.getConnections().size();i++){
+		   Connection aConnection = tile.getConnections().get(i);
+		   Connection newConnection = new Connection(currentGame);
+		   newConnection.addTile(newWinTile);
+		   int ind = aConnection.getTiles().indexOf(tile);
+		   Tile test;
+		   if (ind==0){
+			   newConnection.addTile(aConnection.getTiles().get(1));
+			   aConnection.getTiles().get(1).removeConnection(aConnection);
+		   }
+		   else{  
+			   newConnection.addTile(aConnection.getTiles().get(0));
+			   aConnection.getTiles().get(0).removeConnection(aConnection);
+		   }
+	   }
+	   
+	   tile.delete();
+	   
+	   currentGame.setWinTile(newWinTile);
+	  
+   }
+
+}
+
+class AdditionalMoveActionCard {
+  isA ActionCard;
+  
+  public Mode getActionCardGameMode() {
+    return Mode.GAME_ADDITIONALMOVEACTIONCARD;
+  }
+  
+  public List<Tile> play(int numOfMoves){
+	    Game thisGame = this.getDeck().getGame();
+		List<Tile> possibleDestinations = thisGame.takeTurn(numOfMoves);
+		return possibleDestinations;
+	  }
+}
+
+class DeactivateActionTileActionCard {
+  isA ActionCard;
+  
+   public Mode getActionCardGameMode(){
+    return Mode.GAME_DEACTIVATEACTIONTILEACTIONCARD;
+  }
+
+
+   public void play(){
+    Game currentGame = this.getDeck().getGame();
+	   for (Tile aTile: currentGame.getTiles()){
+		   if ( (aTile instanceof ActionTile) && (((ActionTile) aTile).getActionTileStatusFullName().equals("Active"))) {
+			   ((ActionTile) aTile).deactivate();
+		   }
+	   }
+  }
+  
+}
+
+class RevealTileActionCard {
+  isA ActionCard;
+  
+   public Mode getActionCardGameMode(){
+    return Mode.GAME_REVEALTILEACTIONCARD;
+  }
+   
+   public String play(Tile tile){
+	    
+	    if (tile instanceof NormalTile){
+	    	return "Normal";
+	    }
+	    else if (tile instanceof ActionTile){
+	    	return "Action";
+	    }
+	    else if (tile instanceof WinTile){
+	    	return "Win";
+	    }
+	    
+	    return null;
+	  }  
+  
+}
+
+class WinTileHintActionCard {
+  isA ActionCard;
+  
+  public Mode getActionCardGameMode() {
+    return Mode.GAME_WINTILEHINTACTIONCARD;
+  }
+}
+
+class SwapPositionActionCard {
+  isA ActionCard;
+  
+  public Mode getActionCardGameMode() {
+    return Mode.GAME_SWAPPOSITIONACTIONCARD;
+  }
+  
+  public void play(Tile tile, Player player) throws RuntimeException{
+	    player.setCurrentTile(tile);
+  }
+  
+  public void play(int playerNum) throws RuntimeException{
+	    Game currentGame = this.getDeck().getGame();
+	  Player currentPlayer = currentGame.getCurrentPlayer();
+	  Player chosenPlayer = currentGame.getPlayer(playerNum - 1);
+	  Tile currentTile = currentPlayer.getCurrentTile();
+	  Tile chosenTile = chosenPlayer.getCurrentTile();
+	  currentPlayer.setCurrentTile(chosenTile);
+	     chosenPlayer.setCurrentTile(currentTile);    
+	}
+
+  
+}
+
+class MoveOtherPlayerActionCard {
+  isA ActionCard;
+  
+  public Mode getActionCardGameMode() {
+    return Mode.GAME_MOVEOTHERPLAYERACTIONCARD;
+  }
+  
+  public void play(Tile tile, Player player) throws RuntimeException{
+	    player.setCurrentTile(tile);
+	  }
+  
+
+  
+}
+
+
+class Die {
+  public int roll(){
+		   int move = ThreadLocalRandom.current().nextInt(1,7);
+		  return move;
+  }
+}
+
+

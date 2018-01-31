@@ -1,0 +1,127 @@
+external interface Serializable {}
+
+class ActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  depend java.io.Serializable;
+  isA Serializable;
+  private static final long serialVersionUID = -2683593616927798071L;
+}
+
+class ActionTile {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = 2315072607928790501L;
+}
+
+class Connection {
+  depend java.io.Serializable;
+  isA Serializable;
+  private static final long serialVersionUID = 8896099581655989380L;
+}
+
+class ConnectTilesActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = 386717977557499839L;
+}
+
+class Deck {
+  depend java.io.Serializable;
+  isA Serializable;
+  private static final long serialVersionUID = -2045406856025012133L;
+}
+
+class Die {
+  depend java.io.Serializable;
+  isA Serializable;
+  private static final long serialVersionUID = -7403802774454467836L;
+}
+
+class Game {
+  depend java.io.Serializable;
+  isA Serializable;
+  private static final long serialVersionUID = -127L;
+}
+
+class LoseTurnActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -128L;
+}
+
+class NormalTile {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -129L;
+}
+
+class Player {
+  depend java.io.Serializable;
+  isA Serializable;
+  private static final long serialVersionUID = -130L;  
+}
+
+class RemoveConnectionActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -131L;
+}
+
+class RollDieActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -132L;
+}
+
+class TeleportActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -133L;
+}
+
+class Tile {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  depend java.io.Serializable;
+  isA Serializable;
+  private static final long serialVersionUID = -134L;
+}
+
+class TileO {
+  depend java.io.Serializable;
+  isA Serializable;
+  private static final long serialVersionUID = -135L;
+}
+
+class WinTile {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -136L;
+}
+
+class MoveWinTileActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -137L;
+}
+
+class AdditionalMoveActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -138L;
+}
+
+class DeactivateActionTileActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -139L;
+}
+
+class RevealTileActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -140L;
+}
+
+class WinTileHintActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -141L;
+}
+
+class SwapPositionActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -142L;
+}
+
+class MoveOtherPlayerActionCard {
+  depend ca.mcgill.ecse223.tileo.model.Game.Mode;
+  private static final long serialVersionUID = -143L;
+}
+

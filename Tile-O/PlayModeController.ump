@@ -1,0 +1,907 @@
+namespace ca.mcgill.ecse223.tileo.controller;
+
+class PlayModeController {
+	   controllerMode {
+			 Ready {
+					startGame() / {
+						   doStartGame();
+					} -> Roll;
+					load(Game selectedGame) [isInGameMode(selectedGame)] / {
+						   doLoad(selectedGame);
+					} -> Roll;
+					load(Game selectedGame) [isInWonMode(selectedGame)] / {
+						   doLoad(selectedGame);
+					} -> Won;
+					load(Game selectedGame) [isNotInGameOrWonMode(selectedGame)] / {
+						   doLoad(selectedGame);
+					} -> ActionCard;
+			 }
+			 Roll {
+					rollDie() / {
+						   possibleMoves = doRollDie();
+					} -> Move;
+			 }
+			 Move {
+			 	    land(Tile tile) [isNormalTile(tile)] / {
+			 			   doLand(tile);
+					} -> Roll;
+					land(Tile tile) [isWinTile(tile)] / {
+						   doLand(tile);
+					} -> Won;
+					land(Tile tile) [isActionTile(tile)] / {
+						   doLand(tile);
+					} -> ActionCard;
+			 }
+			 ActionCard {
+			 	    playRollDieActionCard() [isRollDieActionCard()] / {
+						   possibleMoves = doPlayRollDieActionCard();
+					} -> Move;
+					playConnectTilesActionCard(Tile tile1, Tile tile2) 
+						   [isConnectTilesActionCard()] / {
+						   doPlayConnectTilesActionCard(tile1, tile2);
+					} -> Roll;
+					playRemoveConnectionActionCard(Connection c)
+						   [isRemoveConnectionActionCard()] / {
+						   doPlayRemoveConnectionActionCard(c);
+					} -> Roll;
+					playTeleportActionCard(Tile tile) 
+						   [isTeleportAndNormalTile(tile)] / {
+						   doPlayTeleportActionCard(tile);
+					} -> Roll;
+					playTeleportActionCard(Tile tile) [isTeleportAndWinTile(tile)] / {
+						   doPlayTeleportActionCard(tile);
+					} -> Won;
+					playTeleportActionCard(Tile tile) [isTeleportAndActionTile(tile)] / {
+						   doPlayTeleportActionCard(tile);
+					} -> ActionCard;
+					playLoseTurnActionCard()[isLoseTurnActionCard()] / {
+						   doPlayLoseTurnActionCard();
+					} -> Roll;
+					playMoveWinTileActionCard(Tile tile)[isMoveWinTileActionCard()] / {
+					       doPlayMoveWinTileActionCard(tile);
+					} -> Roll;
+					playMoveOtherPlayerActionCard(Tile tile, Player player)[isMoveOtherPlayerActionCard()] / {
+					       doPlayMoveOtherPlayerActionCard(tile, player);
+					} -> Roll;
+					playSwapPositionActionCard(int num)[isSwapPositionActionCard()] / {
+					       doPlaySwapPositionActionCard(num);
+					} -> Roll;
+					playAdditionalMoveActionCard(int numOfMoves)[isAdditionalMoveActionCard()] / {
+                           doPlayAdditionalMoveActionCard(numOfMoves);
+					} -> Move;
+					playWinTileHintActionCard(Tile tile)[isWinTileHintActionCard()] / {
+					       doPlayWinTileHintActionCard(tile);
+					} -> Roll;
+					playDeactivateActionTileActionCard()[isDeactivateActionTileActionCard()] / {
+                           doPlayDeactivateActionTileActionCard();
+					} -> Roll;
+					playRevealTileActionCard(Tile tile)[isRevealTileActionCard()] / {
+					       doPlayRevealTileActionCard(tile);
+					} -> Roll;
+			 }
+	  }
+	  1 -> * Tile possibleMoves;
+	  
+	  int numOfMoves = 0;
+	  
+	  String tileHint = "";
+	
+  private boolean isNormalTile(Tile aTile){
+	  if ( (aTile instanceof ActionTile) && (((ActionTile) aTile).getActionTileStatusFullName().equals("Inactive"))){
+		return true;
+	  }
+	  return aTile instanceof NormalTile;
+  }
+  
+  private boolean isWinTile(Tile aTile){
+	  return aTile instanceof WinTile;
+  }
+  
+  private boolean isActionTile(Tile aTile){
+	  boolean isActive = false;
+	  if (((ActionTile) aTile).getActionTileStatusFullName().equals("Active")){
+		  isActive = true;
+	  }
+	  return isActive && (aTile instanceof ActionTile);
+  }
+  
+  private boolean isRollDieActionCard(){
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof RollDieActionCard;
+  }
+  
+  private boolean isLoseTurnActionCard(){
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof LoseTurnActionCard;
+  }
+  
+  private boolean isConnectTilesActionCard(){
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof ConnectTilesActionCard;
+  }
+  
+  private boolean isRemoveConnectionActionCard(){
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof RemoveConnectionActionCard;
+  }
+  
+  private boolean isTeleportAndNormalTile(Tile tile){
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  boolean isTeleport = deck.getCurrentCard() instanceof TeleportActionCard;
+	  boolean isNormalTile = isNormalTile(tile);
+	  
+	  return isTeleport&&isNormalTile;
+  }
+  
+  private boolean isTeleportAndActionTile(Tile tile){
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  boolean isTeleport = deck.getCurrentCard() instanceof TeleportActionCard;
+	  boolean isActionTile = isActionTile(tile);
+	  
+	  return isTeleport&&isActionTile;
+  }
+  
+  private boolean isTeleportAndWinTile(Tile tile){
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  boolean isTeleport = deck.getCurrentCard() instanceof TeleportActionCard;
+	  boolean isWinTile = isWinTile(tile);
+	  
+	  return isTeleport&&isWinTile;
+  }
+  
+  private boolean isMoveWinTileActionCard() {
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof MoveWinTileActionCard;
+  }
+  
+  private boolean isMoveOtherPlayerActionCard() {
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof MoveOtherPlayerActionCard;
+  }
+  
+  private boolean isSwapPositionActionCard() {
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof SwapPositionActionCard;
+  }
+  
+  private boolean isAdditionalMoveActionCard() {
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof AdditionalMoveActionCard;
+  }
+  
+  private boolean isWinTileHintActionCard() {
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof WinTileHintActionCard;
+  }
+  
+  private boolean isDeactivateActionTileActionCard() {
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof DeactivateActionTileActionCard;
+  }
+  
+  private boolean isRevealTileActionCard() {
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  return deck.getCurrentCard() instanceof RevealTileActionCard;
+  }  
+  
+ 
+  public void setCurrentGame(Game game){
+    TileO tileo = TileOApplication.getTileO();
+		tileo.setCurrentGame(game);
+  }
+
+ 
+  public List<Game> getGames(){
+    TileO tileo = TileOApplication.getTileO();
+		List<Game> allGames = tileo.getGames();
+		return allGames;
+  }
+
+ 
+  public List<Tile> getTiles(){
+    return TileOApplication.getTileO().getCurrentGame().getTiles();
+  }
+
+ 
+  public List<Connection> getConnections(){
+    return TileOApplication.getTileO().getCurrentGame().getConnections();
+  }
+
+  
+  public List<Tile> getConnectedTiles(Connection connection){
+    return connection.getTiles();
+  }
+
+ 
+  public List<Player> getPlayers(){
+    TileO tileo = TileOApplication.getTileO();
+		List<Player> allPlayers = tileo.getCurrentGame().getPlayers();
+		return allPlayers;
+  }
+
+  
+   public int getCurrentPlayerNum(){
+    TileO tileo = TileOApplication.getTileO();
+		Game currentGame = tileo.getCurrentGame();
+		return currentGame.getCurrentPlayer().getNumber();
+  }
+
+ 
+   public Game getCurrentGame(){
+    TileO tileo = TileOApplication.getTileO();
+		Game currentGame = tileo.getCurrentGame();
+		return currentGame;
+  }
+
+ 
+   public String getGameMode(){
+    TileO tileo = TileOApplication.getTileO();
+		Game currentGame = tileo.getCurrentGame();
+		String mode = currentGame.getMode().name();
+		return mode;
+  }
+
+  
+   public void save(){
+    TileOApplication.save();
+  }
+  
+  private void cloneGame() {
+
+	    TileO tileO = TileOApplication.getTileO();
+	    Game cloned = tileO.getCurrentGame().clone();
+	    tileO.addGame(cloned);
+	    tileO.setCurrentGame(cloned);
+
+  }
+
+ 
+  private void doStartGame() throws InvalidInputException{
+    String error = "";
+		boolean allHaveStartingTiles = true;
+		cloneGame();
+		Game currentGame = TileOApplication.getTileO().getCurrentGame();
+		
+		
+		if (currentGame.getDeck().getCards().size()!=currentGame.NumberOfActionCards){
+			error = "Invalid number of action cards!";
+		}
+
+		if (currentGame.hasTiles()==false){
+			error = error + "This game does not have any tiles!";
+		}
+
+		else if (currentGame.hasWinTile()==false){
+			error = error + "This game does not have a win tile!";
+
+		}
+
+		if (currentGame.hasConnections()==false){
+			error = error + "This game does not have any connection pieces!";
+		}
+
+		if (currentGame.hasPlayers()==false){
+			error = error + "The game does not have any players!";
+		}
+
+		else{
+			for (Player player : currentGame.getPlayers()){
+				if (player.hasStartingTile()==false){
+					allHaveStartingTiles = false;
+					error = error + "Every player must have a starting position!";
+					break;
+				}
+			}
+			
+			if (allHaveStartingTiles == true){
+				for (Player player : currentGame.getPlayers()){
+					if (player.getStartingTile().hasConnections()==false){
+						error = error + "There must be at least one connection piece connected to each player's starting position";
+						break;
+					}
+				}
+
+
+				for (Player player : currentGame.getPlayers()){
+					if(  (currentGame.hasWinTile()==true) && ( player.getStartingTile().getX() == currentGame.getWinTile().getX() ) && ( player.getStartingTile().getY() == currentGame.getWinTile().getY() ) ){
+						error = error + "The player's starting tile cannot be the win tile!";
+						break;
+					}
+				}
+			}
+		}
+
+		if (error.length()>0) {
+			throw new InvalidInputException(error);
+		}
+
+
+		TileO tileo = TileOApplication.getTileO();
+		tileo.setCurrentGame(currentGame);
+
+		List<Player> allPlayers = currentGame.getPlayers();
+		List<Tile> allTiles = currentGame.getTiles();
+
+		for (Tile aTile : allTiles){
+			aTile.setHasBeenVisited(false);
+			if (aTile instanceof ActionTile){
+				((ActionTile)aTile).activate();
+			}
+		}
+
+		currentGame.setCurrentPlayer(allPlayers.get(0));
+
+		for (Player aPlayer : allPlayers){
+			aPlayer.getStartingTile().setHasBeenVisited(true);
+			aPlayer.setCurrentTile(aPlayer.getStartingTile());
+		}
+		currentGame.setMode(Mode.GAME);
+		currentGame.setCurrentConnectionPieces(32);
+
+		Deck deck = currentGame.getDeck();
+		deck.shuffle();
+		deck.setCurrentCard(deck.getCards().get(0));
+		
+  }
+ 
+   private List<Tile> doRollDie(){
+	   TileO tileo = TileOApplication.getTileO();
+	   Game currentGame = tileo.getCurrentGame();
+	   numOfMoves = currentGame.getDie().roll();
+	   List<Tile> possibleDestinations = currentGame.takeTurn(numOfMoves);
+		
+	   return possibleDestinations;
+		
+		
+		/*
+		Die die = currentGame.getDie();
+		int numOfMoves = die.roll();
+		List<Tile> possibleDestinations = currentGame.takeTurn();
+		return possibleDestinations;*/
+  }
+
+ 
+   private int numberRolled(){
+    return numOfMoves;
+  }
+
+  
+   private void doLand(Tile tile){
+    TileO tileo = TileOApplication.getTileO();
+		Game currentGame = tileo.getCurrentGame();
+
+		boolean contain = false;
+		
+		
+		/* Which one???
+		for ( Tile aTile: currentGame.getTiles() ) {
+			if ( currentGame.getTiles().contains(tile)){
+				contain = true;
+			}
+		}*/
+		
+		for ( Tile aTile: currentGame.getTiles() ) {
+			if ( (aTile.getX()==tile.getX()) && (aTile.getY()==tile.getY()) ){
+				contain = true;
+			}
+		}
+
+		if (contain==false){
+			throw new RuntimeException("Tile does not exist!");
+		}
+
+		tile.land();
+  }
+
+ 
+   private List<Tile> doPlayRollDieActionCard() throws InvalidInputException{
+    TileO tileo = TileOApplication.getTileO();
+		Game currentGame = tileo.getCurrentGame();
+		Deck deck = currentGame.getDeck();
+		ActionCard currentCard = deck.getCurrentCard();
+		List<Tile> possibleDestinations = new ArrayList<Tile>();
+		
+
+		RollDieActionCard card = (RollDieActionCard) deck.getCurrentCard();
+		numOfMoves = currentGame.getDie().roll();
+		possibleDestinations = card.play(numOfMoves);
+		
+		
+		int currentInd = deck.indexOfCard(currentCard);
+		int totalCard = deck.getCards().size();
+		
+		if ( (currentInd+1) == totalCard){
+			deck.shuffle();
+			deck.setCurrentCard(deck.getCard(0));
+		}
+		else{
+			deck.setCurrentCard(deck.getCard(currentInd+1));
+		}
+		
+		currentGame.setMode(Mode.GAME);
+		
+		return possibleDestinations;
+  }
+
+
+   private void doPlayConnectTilesActionCard(Tile tile1, Tile tile2) throws InvalidInputException{
+        TileO tileO = TileOApplication.getTileO();
+		Game currentGame = tileO.getCurrentGame();
+		List<Tile> allTiles = currentGame.getTiles();
+		
+		int spareConnections = currentGame.getCurrentConnectionPieces();
+		
+		//Check if both tiles exist in this game
+		boolean tile1Exists = false;
+		boolean tile2Exists = false;
+		
+		if (tile1==null || tile2==null){
+			throw new InvalidInputException("You must select two tiles before clicking the Connect Button!");
+		}
+
+		for ( Tile aTile: allTiles ) {
+			if ( (aTile.getX()==tile1.getX()) && (aTile.getY()==tile1.getY()) ){
+				tile1Exists = true;
+				break;
+			}
+		}
+		
+		for ( Tile aTile: allTiles ) {
+			if ( (aTile.getX()==tile2.getX()) && (aTile.getY()==tile2.getY()) ){
+				tile2Exists = true;
+				break;
+			}
+		}
+
+
+	
+		if(tile1Exists == false || tile2Exists == false){
+			throw new InvalidInputException("You must choose (a) tile(s) that exist(s) in this game!");
+		}
+		
+		
+		
+		if (spareConnections==0){
+			throw new InvalidInputException("Unfortunately there are no connections pieces left");
+		}
+
+		//Check if the selected tiles are adjacent tiles
+		boolean ifAdjacent = false;
+		
+		
+		if( (tile1.getX()==tile2.getX()) && (Math.abs(tile1.getY()-tile2.getY()) == 1) ){
+			ifAdjacent = true;
+		}
+		else if( (tile1.getY()==tile2.getY()) && (Math.abs(tile1.getX()-tile2.getX()) == 1) ){
+			ifAdjacent = true;
+		}
+
+		if(ifAdjacent == false){
+			throw new InvalidInputException(" must be adjacent!");
+		}
+
+		Deck deck = currentGame.getDeck();
+		ActionCard currentCard = deck.getCurrentCard();
+	
+		boolean connected = false;
+		
+		if (tile1.hasConnections()){
+			for (Connection aConnection: tile1.getConnections()){
+				if ( (aConnection.getTiles().contains(tile1)) && (aConnection.getTiles().contains(tile2)) ){
+					connected = true;
+				}
+			}
+		}
+
+		
+		ConnectTilesActionCard card = (ConnectTilesActionCard) currentCard;
+		if (connected==false){
+			card.play(tile1, tile2);
+		}
+
+		currentGame.determineNextPlayer();
+		currentGame.updateTileStatus();
+
+		int indexCard = deck.indexOfCard(currentCard);
+		int numberOfCards = deck.numberOfCards();
+		
+		if( (indexCard+1) == numberOfCards ){
+			deck.shuffle();
+			deck.setCurrentCard(deck.getCard(0));
+		}
+		else{
+			deck.setCurrentCard( deck.getCard(indexCard+1) );
+		}
+
+		
+		currentGame.setCurrentConnectionPieces(spareConnections-1);
+		currentGame.setMode(Mode.GAME);
+  }
+
+   private void doPlayRemoveConnectionActionCard(Connection connection) throws InvalidInputException{
+    TileO tileo = TileOApplication.getTileO();
+		Game currentGame = tileo.getCurrentGame();
+		
+		if (connection==null){
+			throw new InvalidInputException("Please select a connection to remove");
+		}
+		
+		if ( currentGame.getConnections().contains(connection) == false ) {
+			throw new InvalidInputException("The selected connection does not exist in this game!");
+		}
+		
+		Deck deck = currentGame.getDeck();
+		ActionCard currentCard = deck.getCurrentCard();
+		
+		RemoveConnectionActionCard card = (RemoveConnectionActionCard) deck.getCurrentCard();
+		card.play(connection);
+
+		currentGame.determineNextPlayer();
+		currentGame.updateTileStatus();
+
+		int indexCard = deck.indexOfCard(currentCard);
+		int numberOfCards = deck.numberOfCards();
+
+		if( (indexCard+1) == numberOfCards ){
+			deck.shuffle();
+			deck.setCurrentCard(deck.getCard(0));
+		}
+		else{
+			deck.setCurrentCard( deck.getCard(indexCard+1) );
+		}
+		
+		int spareConnections = currentGame.getCurrentConnectionPieces();
+		currentGame.setCurrentConnectionPieces(spareConnections+1);
+		currentGame.setMode(Mode.GAME);
+  }
+
+   private void doPlayTeleportActionCard(Tile tile) throws InvalidInputException{
+    TileO tileo = TileOApplication.getTileO();
+	    Game currentGame = tileo.getCurrentGame();
+	    List<Tile> allTiles = currentGame.getTiles();
+	    
+	    if ( !(allTiles.contains(tile)) ){
+	    	throw new InvalidInputException("This tile does not exist in this game!");
+	    }
+	    
+	    Deck deck = currentGame.getDeck();
+	    ActionCard currentCard = deck.getCurrentCard();
+	    int indexCard = deck.indexOfCard(currentCard);
+		int numberOfCards = deck.numberOfCards();
+
+		if( (indexCard+1) == numberOfCards ){
+			deck.shuffle();
+			deck.setCurrentCard(deck.getCard(0));
+		}
+		else{
+			deck.setCurrentCard( deck.getCard(indexCard+1) );
+		}
+		
+		TeleportActionCard card = (TeleportActionCard) currentCard;
+		card.play(tile);
+  }
+   
+  private void doPlayLoseTurnActionCard() throws InvalidInputException{
+	  TileO tileo = TileOApplication.getTileO();
+	  Game currentGame = tileo.getCurrentGame();
+	  Deck deck = currentGame.getDeck();
+	  LoseTurnActionCard currentCard = (LoseTurnActionCard)deck.getCurrentCard();
+	 
+	  currentCard.play(); 
+	  
+	  currentGame.determineNextPlayer();
+	  currentGame.updateTileStatus();
+	  
+	  
+	  int indexCard = deck.indexOfCard(currentCard);
+		int numberOfCards = deck.numberOfCards();
+
+		if( (indexCard+1) == numberOfCards ){
+			deck.shuffle();
+			deck.setCurrentCard(deck.getCard(0));
+		}
+		else{
+			deck.setCurrentCard( deck.getCard(indexCard+1) );
+		}
+		
+		currentGame.setMode(Mode.GAME);
+
+  }
+  
+  private void doLoad(Game selectedGame)throws InvalidInputException{
+	  TileO tileo = TileOApplication.getTileO();
+		if (selectedGame == null){
+			throw new InvalidInputException("Please select a game to load!");
+		}
+		
+		if (selectedGame.getMode().name().equals("DESIGN")){
+			throw new InvalidInputException("Design is not finished!\n"
+					+ "If you have finished the design, please press the\n"
+					+ "load buttonon Design Mode Page to start the game.");
+		}
+		
+		try{
+			tileo.setCurrentGame(selectedGame);
+			
+		}
+		catch(RuntimeException e){
+			throw new InvalidInputException(e.getMessage());
+		}	
+		
+  }
+  
+
+   public Connection getThisConnection(Tile tile1, Tile tile2){
+    for (int i=0; i<tile1.getConnections().size();i++){
+			List<Tile> connectedTiles = tile1.getConnections().get(i).getTiles();
+			for (int n=0; n<connectedTiles.size();n++){
+				if (connectedTiles.get(n).getX()==tile2.getX() && (connectedTiles.get(n).getX()==tile2.getX())){
+					return tile1.getConnections().get(i);
+				}
+			}
+		}
+		
+		return null;
+  }
+  
+
+
+   private void doPlayMoveWinTileActionCard(Tile tile) throws InvalidInputException{
+	  TileO tileo = TileOApplication.getTileO();
+	   Game currentGame = tileo.getCurrentGame();
+	   List<Tile> allTiles = currentGame.getTiles();
+	    
+	    Deck deck = currentGame.getDeck();
+	    MoveWinTileActionCard currentCard = (MoveWinTileActionCard)deck.getCurrentCard();
+	    
+	    if (tile==null) {
+	    	throw new InvalidInputException("You must select a tile");
+	    }
+	    if ( !(allTiles.contains(tile)) ){
+	    	throw new InvalidInputException("This tile does not exist in this game!");
+	    }
+
+	    if (isWinTile(tile)==false){
+	    	try{
+	    	 currentCard.play(tile);
+	    	}
+	    	catch(RuntimeException e){
+	    		throw new InvalidInputException(e.getMessage());
+	    	}
+    	}
+	  
+
+	    currentGame.determineNextPlayer();
+		currentGame.updateTileStatus();
+
+		
+		int indexCard = deck.indexOfCard(currentCard);
+		int numberOfCards = deck.numberOfCards();
+
+		if( (indexCard+1) == numberOfCards ){
+			deck.shuffle();
+			deck.setCurrentCard(deck.getCard(0));
+		}
+		else{
+			deck.setCurrentCard( deck.getCard(indexCard+1) );
+		}
+		currentGame.setMode(Mode.GAME);
+  }
+	
+	
+	private void doPlayDeactivateActionTileActionCard(){
+	   TileO tileo = TileOApplication.getTileO();
+	   Game currentGame = tileo.getCurrentGame();
+	   List<Tile> allTiles = currentGame.getTiles();
+	    
+	    Deck deck = currentGame.getDeck();
+	    DeactivateActionTileActionCard currentCard = (DeactivateActionTileActionCard)deck.getCurrentCard();
+	    currentCard.play();
+	   
+	    currentGame.determineNextPlayer();
+	    currentGame.updateTileStatus();
+	   
+	    
+	    int indexCard = deck.indexOfCard(currentCard);
+		int numberOfCards = deck.numberOfCards();
+
+		if( (indexCard+1) == numberOfCards ){
+			deck.shuffle();
+			deck.setCurrentCard(deck.getCard(0));
+		}
+		else{
+			deck.setCurrentCard( deck.getCard(indexCard+1) );
+		}
+		currentGame.setMode(Mode.GAME);
+   }
+   
+    private void doPlayRevealTileActionCard(Tile tile){
+    	TileO tileo = TileOApplication.getTileO();
+	    Game currentGame = tileo.getCurrentGame();
+	    List<Tile> allTiles = currentGame.getTiles();
+	    
+	    Deck deck = currentGame.getDeck();
+	    RevealTileActionCard currentCard = (RevealTileActionCard)deck.getCurrentCard();
+	    
+	    String tileType = currentCard.play(tile);
+	    this.setTileHint(tileType);
+	    
+	    currentGame.determineNextPlayer();
+	    currentGame.updateTileStatus();
+	    
+	    int indexCard = deck.indexOfCard(currentCard);
+		int numberOfCards = deck.numberOfCards();
+
+		if( (indexCard+1) == numberOfCards ){
+			deck.shuffle();
+			deck.setCurrentCard(deck.getCard(0));
+		}
+		else{
+			deck.setCurrentCard( deck.getCard(indexCard+1) );
+		}
+		currentGame.setMode(Mode.GAME);
+   }
+   
+   
+	private void doPlayMoveOtherPlayerActionCard(Tile tile, int playerNum) throws InvalidInputException{
+	    TileO tileo = TileOApplication.getTileO();
+	    Game currentGame = tileo.getCurrentGame();
+	    List<Tile> allTiles = currentGame.getTiles();
+	    
+	    Deck deck = currentGame.getDeck();
+	    MoveOtherPlayerActionCard currentCard = (MoveOtherPlayerActionCard) deck.getCurrentCard();
+		
+		if (tile==null){
+			throw new InvalidInputException("You must select a tile before clicking the Move Other Player Button!");
+		}
+		else if ( !(allTiles.contains(tile)) ){
+	    	throw new InvalidInputException("This tile does not exist in this game!");
+	    }
+	    else if(playerNum > currentGame.getPlayers().size()){
+	        throw new InvalidInputException("This player does not exist in this game!");
+	    }
+	    else if(playerNum  == 0){
+	        throw new InvalidInputException("You must select a player before clicking the Move Other Player Button!");
+	    }
+	    else if(playerNum  == currentGame.getCurrentPlayer().getNumber()){
+			throw new InvalidInputException("You Cannot Choose Yourself!");
+		}
+	    else{
+	        Player chosenPlayer = currentGame.getPlayer(playerNum - 1);
+	        currentCard.play(tile, chosenPlayer);
+	    }
+	    currentGame.determineNextPlayer();
+		currentGame.updateTileStatus();
+
+		int indexCard = deck.indexOfCard(currentCard);
+		int numberOfCards = deck.numberOfCards();
+
+		if( (indexCard+1) == numberOfCards ){
+			deck.shuffle();
+			deck.setCurrentCard(deck.getCard(0));
+		}
+		else{
+			deck.setCurrentCard( deck.getCard(indexCard+1) );
+		}
+		currentGame.setMode(Mode.GAME);
+	}
+	
+    private void doPlaySwapPositionActionCard(int playerNum) throws InvalidInputException{
+		 TileO tileo = TileOApplication.getTileO();
+			Game currentGame = tileo.getCurrentGame();
+			Deck deck = currentGame.getDeck();
+		  	SwapPositionActionCard currentCard = (SwapPositionActionCard)deck.getCurrentCard();
+			
+			if (playerNum > currentGame.getPlayers().size()) {
+				throw new InvalidInputException("There are only"+""+currentGame.getPlayers().size()+"" +"players in the game!");
+			}
+			else if(playerNum == 0){
+				throw new InvalidInputException("you must select a player");
+			}
+			else if(playerNum == currentGame.getCurrentPlayer().getNumber()){
+				throw new InvalidInputException("you cannot choose yourself!");
+			}
+			else{
+		 
+		 	currentCard.play(playerNum); 
+			}
+			
+		    currentGame.determineNextPlayer();
+
+		    int indexCard = deck.indexOfCard(currentCard);
+			int numberOfCards = deck.numberOfCards();
+
+			if( (indexCard+1) == numberOfCards ){
+				deck.shuffle();
+				deck.setCurrentCard(deck.getCard(0));
+			}
+			else{
+				deck.setCurrentCard( deck.getCard(indexCard+1) );
+			}
+			
+		    currentGame.setMode(Mode.GAME);
+	   }
+    
+    
+    private List<Tile> doPlayAdditionalMoveActionCard(int numOfMoves) throws InvalidInputException{
+ 		TileO tileo = TileOApplication.getTileO();
+ 		Game currentGame = tileo.getCurrentGame();
+ 		Deck deck = currentGame.getDeck();
+ 		ActionCard currentCard = deck.getCurrentCard();
+ 		List<Tile> possibleDestinations = new ArrayList<Tile>();
+ 		
+
+ 		AdditionalMoveActionCard card = (AdditionalMoveActionCard) deck.getCurrentCard();
+ 		possibleDestinations = card.play(numOfMoves);
+ 		
+ 		
+ 		int currentInd = deck.indexOfCard(currentCard);
+ 		int totalCard = deck.getCards().size();
+ 		
+ 		if ( (currentInd+1) == totalCard){
+ 			deck.shuffle();
+ 			deck.setCurrentCard(deck.getCard(0));
+ 		}
+ 		else{
+ 			deck.setCurrentCard(deck.getCard(currentInd+1));
+ 		}
+ 		
+ 		currentGame.setMode(Mode.GAME);
+ 		
+ 		return possibleDestinations;
+   }
+    
+	
+  private boolean isNotInGameOrWonMode(Game selectedGame) {
+	  if (isInWonMode(selectedGame)==false && isInGameMode(selectedGame)==false){
+		  return true;
+	  }
+	  return false;
+  }
+
+  private boolean isInWonMode(Game selectedGame) {
+	  if (selectedGame.getModeFullName().equals("GAME_WON")){
+		  return true;
+	  }
+	  return false;
+  }
+
+  private boolean isInGameMode(Game selectedGame) {
+	  if (selectedGame.getModeFullName().equals("GAME")){
+		  return true;
+	  }
+	  return false;
+  }
+
+
+	  
+	  
+}
